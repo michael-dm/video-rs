@@ -17,7 +17,6 @@ use ffmpeg::Error as AvError;
 use ffmpeg::Rational as AvRational;
 
 use crate::error::Error;
-use crate::ffi;
 #[cfg(feature = "ndarray")]
 use crate::frame::Frame;
 use crate::frame::{PixelFormat, RawFrame, FRAME_PIXEL_FORMAT};
@@ -27,6 +26,7 @@ use crate::location::Location;
 use crate::options::Options;
 #[cfg(feature = "ndarray")]
 use crate::time::Time;
+use crate::{ffi, ThreadingConfig};
 
 type Result<T> = std::result::Result<T, Error>;
 
@@ -388,6 +388,7 @@ pub struct Settings {
     height: u32,
     pixel_format: AvPixel,
     keyframe_interval: u64,
+    threading_config: Option<ThreadingConfig>,
     options: Options,
 }
 
@@ -414,6 +415,7 @@ impl Settings {
             height: height as u32,
             pixel_format: AvPixel::YUV420P,
             keyframe_interval: Self::KEY_FRAME_INTERVAL,
+            threading_config: None,
             options,
         }
     }
@@ -443,6 +445,7 @@ impl Settings {
             height: height as u32,
             pixel_format,
             keyframe_interval: Self::KEY_FRAME_INTERVAL,
+            threading_config: None,
             options,
         }
     }
@@ -455,6 +458,14 @@ impl Settings {
     /// Set the keyframe interval.
     pub fn with_keyframe_interval(mut self, keyframe_interval: u64) -> Self {
         self.set_keyframe_interval(keyframe_interval);
+        self
+    }
+
+    /// Set threading configuration.
+    ///
+    /// * `threading_config` - Threading configuration.
+    pub fn with_threading_config(mut self, threading_config: ThreadingConfig) -> Self {
+        self.threading_config = Some(threading_config);
         self
     }
 
@@ -472,6 +483,10 @@ impl Settings {
         encoder.set_height(self.height);
         encoder.set_format(self.pixel_format);
         encoder.set_frame_rate(Some((Self::FRAME_RATE, 1)));
+
+        if let Some(config) = self.threading_config {
+            encoder.set_threading(config.into());
+        }
     }
 
     /// Get codec.
